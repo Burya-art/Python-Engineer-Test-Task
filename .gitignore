@@ -19,3 +19,6 @@ friends.json  # Якщо додамо JSON-БД пізніше
 # IDE
 .idea/
 .vscode/
+
+# Секретні файли
+.env
