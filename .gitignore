@@ -1,0 +1,21 @@
+# Віртуальне середовище
+.venv/
+venv/
+env/
+
+# Файли Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Збережені фото (не коміть їх)
+app/storage/media/
+
+# Логі та БД
+*.log
+friends.json  # Якщо додамо JSON-БД пізніше
+
+# IDE
+.idea/
+.vscode/
