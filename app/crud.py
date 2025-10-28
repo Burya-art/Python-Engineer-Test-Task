@@ -1,37 +1,36 @@
-import os
-import uuid
 from PIL import Image
-from app.schemas import Friend
+import io
+import uuid
+import os
 
-friends = {}
-
-def create_friend(name: str, profession: str, profession_description: str | None, photo: bytes) -> Friend:
+def create_friend(name: str, profession: str, profession_description: str | None, photo_data: bytes):
+    # Перевірка: чи це валідне зображення
     try:
-        img = Image.open(photo)
-        img.close()
-    except:
-        raise ValueError("Файл не є зображенням")
+        img = Image.open(io.BytesIO(photo_data))
+        img.verify()  # Перевірка на пошкодження
+        img = Image.open(io.BytesIO(photo_data))  # Відкриваємо ще раз
+    except Exception as e:
+        raise ValueError(f"Файл не є зображенням: {e}")
 
+    # Збереження
     os.makedirs("app/storage/media", exist_ok=True)
-    filename = f"{uuid.uuid4()}.{photo.filename.split('.')[-1]}"
-    file_path = f"app/storage/media/{filename}"
+    friend_id = str(uuid.uuid4())
+    photo_path = f"app/storage/media/{friend_id}.jpg"
+    img.convert("RGB").save(photo_path, "JPEG")
 
-    with open(file_path, "wb") as f:
-        f.write(photo)
+    return {
+        "id": friend_id,
+        "name": name,
+        "profession": profession,
+        "profession_description": profession_description,
+        "photo_url": f"/media/{friend_id}.jpg"
+    }
 
-    id = str(uuid.uuid4())
-    friend = Friend(
-        id=id,
-        name=name,
-        profession=profession,
-        profession_description=profession_description,
-        photo_url=f"/media/{filename}"
-    )
-    friends[id] = friend
-    return friend
+# In-memory "база"
+friends = {}
 
 def get_all_friends():
     return list(friends.values())
 
-def get_friend(id: str):
-    return friends.get(id)
+def get_friend(friend_id: str):
+    return friends.get(friend_id)

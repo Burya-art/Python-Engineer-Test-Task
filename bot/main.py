@@ -24,14 +24,14 @@ dp = Dispatcher(storage=storage)
 router = Router()
 dp.include_router(router)
 
-# === Стани для /addfriend ===
+# Стани
 class AddFriend(StatesGroup):
     photo = State()
     name = State()
     profession = State()
     description = State()
 
-# === /start ===
+# /start
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.reply(
@@ -42,7 +42,7 @@ async def cmd_start(message: types.Message):
         "/friend <id> — деталі друга"
     )
 
-# === /list ===
+# /list
 @router.message(Command("list"))
 async def cmd_list(message: types.Message):
     try:
@@ -50,19 +50,19 @@ async def cmd_list(message: types.Message):
         if resp.status_code != 200:
             await message.reply("Помилка сервера.")
             return
-        friends = resp.json()
-        if not friends:
+        friends_list = resp.json()
+        if not friends_list:
             await message.reply("Список порожній.")
             return
 
         text = "Твої друзі:\n\n"
-        for f in friends:
+        for f in friends_list:
             text += f"• {f['name']} — {f['profession']}\n  ID: `{f['id']}`\n\n"
         await message.reply(text, parse_mode="Markdown")
     except Exception as e:
         await message.reply("Не вдалося отримати список.")
 
-# === /friend <id> ===
+# /friend <id>
 @router.message(Command("friend"))
 async def cmd_friend(message: types.Message, command: Command):
     if not command.args:
@@ -91,7 +91,7 @@ async def cmd_friend(message: types.Message, command: Command):
     except Exception:
         await message.reply(f"Не вдалося завантажити фото.\n\n{caption}", parse_mode="Markdown")
 
-# === /addfriend ===
+# /addfriend
 @router.message(Command("addfriend"))
 async def cmd_addfriend(message: types.Message, state: FSMContext):
     await message.reply("Надішли фото друга:")
@@ -124,24 +124,33 @@ async def add_description(message: types.Message, state: FSMContext):
     data = await state.get_data()
     await state.clear()
 
-    files = {"photo": ("photo.jpg", data["photo"])}
+    photo_bytes = data["photo"]
+    files = {
+        "photo": ("friend_photo.jpg", photo_bytes, "image/jpeg")
+    }
     form = {
         "name": data["name"],
         "profession": data["profession"],
-        "profession_description": desc
+        "profession_description": desc or ""
     }
 
     try:
-        resp = requests.post(f"{BACKEND_URL}/friends", data=form, files=files)
+        resp = requests.post(
+            f"{BACKEND_URL}/friends",
+            data=form,
+            files=files,
+            timeout=10
+        )
         if resp.status_code == 200:
             friend = resp.json()
             await message.reply(f"Додано!\nID: `{friend['id']}`", parse_mode="Markdown")
         else:
-            await message.reply("Помилка при збереженні.")
+            error = resp.text[:200]
+            await message.reply(f"Помилка сервера: {resp.status_code}\n{error}")
     except Exception as e:
-        await message.reply("Не вдалося надіслати дані на сервер.")
+        await message.reply(f"Не вдалося надіслати: {str(e)}")
 
-# === Запуск ===
+# Запуск
 async def main():
     print("Бот запущено...")
     await dp.start_polling(bot)
