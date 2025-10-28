@@ -1,15 +1,8 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
 from typing import List
-import os
-from .crud import create_friend, get_all_friends, get_friend, friends
+from .crud import create_friend, get_all_friends, get_friend
 
 app = FastAPI()
-
-# Створюємо папку для медіа
-os.makedirs("app/storage/media", exist_ok=True)
-app.mount("/media", StaticFiles(directory="app/storage/media"), name="media")
 
 @app.post("/friends", response_model=dict)
 async def create_friend_endpoint(
@@ -20,14 +13,12 @@ async def create_friend_endpoint(
 ):
     photo_data = await photo.read()
     if not photo_data:
-        raise HTTPException(status_code=400, detail="Фото не передано")
-
+        raise HTTPException(400, "Фото не передано")
     try:
         friend = create_friend(name, profession, profession_description, photo_data)
-        friends[friend["id"]] = friend
         return friend
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(400, str(e))
 
 @app.get("/friends", response_model=List[dict])
 def list_friends():
@@ -37,5 +28,5 @@ def list_friends():
 def friend_detail(friend_id: str):
     friend = get_friend(friend_id)
     if not friend:
-        raise HTTPException(status_code=404, detail="Друг не знайдений")
+        raise HTTPException(404, "Друг не знайдений")
     return friend
