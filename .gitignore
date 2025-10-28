@@ -22,3 +22,4 @@ friends.json  # Якщо додамо JSON-БД пізніше
 
 # Секретні файли
 .env
+.env.example
