@@ -50,6 +50,8 @@ LLM_PROVIDER=mock
 
 Команди в Telegram
 
+@friends_list893_bot
+
 /addfriend — додати друга
 
 /list — список
