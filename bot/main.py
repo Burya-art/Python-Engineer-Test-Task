@@ -31,6 +31,7 @@ class AddFriend(StatesGroup):
     profession = State()
     description = State()
 
+
 # /start
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -39,8 +40,10 @@ async def cmd_start(message: types.Message):
         "Команди:\n"
         "/addfriend — додати друга\n"
         "/list — показати всіх\n"
-        "/friend <id> — деталі друга"
+        "/friend <id> — деталі друга\n"
+        "/ask <id> <питання> — запитати про професію"
     )
+
 
 # /list
 @router.message(Command("list"))
@@ -61,6 +64,7 @@ async def cmd_list(message: types.Message):
         await message.reply(text, parse_mode="Markdown")
     except Exception as e:
         await message.reply("Не вдалося отримати список.")
+
 
 # /friend <id>
 @router.message(Command("friend"))
@@ -91,11 +95,13 @@ async def cmd_friend(message: types.Message, command: Command):
     except Exception:
         await message.reply(f"Не вдалося завантажити фото.\n\n{caption}", parse_mode="Markdown")
 
+
 # /addfriend
 @router.message(Command("addfriend"))
 async def cmd_addfriend(message: types.Message, state: FSMContext):
     await message.reply("Надішли фото друга:")
     await state.set_state(AddFriend.photo)
+
 
 @router.message(AddFriend.photo, lambda m: m.photo)
 async def add_photo(message: types.Message, state: FSMContext):
@@ -106,17 +112,20 @@ async def add_photo(message: types.Message, state: FSMContext):
     await message.reply("Введи ім'я:")
     await state.set_state(AddFriend.name)
 
+
 @router.message(AddFriend.name)
 async def add_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
     await message.reply("Введи професію:")
     await state.set_state(AddFriend.profession)
 
+
 @router.message(AddFriend.profession)
 async def add_profession(message: types.Message, state: FSMContext):
     await state.update_data(profession=message.text)
     await message.reply("Введи опис професії (або *пропусти*):", parse_mode="Markdown")
     await state.set_state(AddFriend.description)
+
 
 @router.message(AddFriend.description)
 async def add_description(message: types.Message, state: FSMContext):
@@ -150,10 +159,47 @@ async def add_description(message: types.Message, state: FSMContext):
     except Exception as e:
         await message.reply(f"Не вдалося надіслати: {str(e)}")
 
+
+# /ask <id> <питання>
+@router.message(Command("ask"))
+async def cmd_ask(message: types.Message, command: Command):
+    if not command.args:
+        await message.reply("Використовуй: /ask <id> <питання>")
+        return
+
+    args = command.args.strip().split(" ", 1)
+    if len(args) < 2:
+        await message.reply("Вкажи ID та питання.")
+        return
+
+    friend_id, question = args[0], args[1]
+
+    try:
+        resp = requests.post(
+            f"{BACKEND_URL}/friends/{friend_id}/ask",
+            json={"question": question},
+            timeout=15
+        )
+        if resp.status_code == 404:
+            await message.reply("Друг не знайдений.")
+            return
+        if resp.status_code != 200:
+            await message.reply(f"Помилка сервера: {resp.status_code}")
+            return
+
+        data = resp.json()
+        answer = data.get("answer", "Немає відповіді.")
+        await message.reply(f"*Відповідь:*\n{answer}", parse_mode="Markdown")
+
+    except Exception as e:
+        await message.reply(f"Не вдалося отримати відповідь: {str(e)}")
+
+
 # Запуск
 async def main():
     print("Бот запущено...")
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
 COPY bot/ ./bot/
+COPY services/ ./services/
 
 ENV PYTHONUNBUFFERED=1
 
