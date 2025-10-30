@@ -23,3 +23,41 @@ friends.json  # Якщо додамо JSON-БД пізніше
 # Секретні файли
 .env
 .env.example
+
+# Serverless & AWS
+.serverless/
+node_modules/
+package-lock.json
+package.json
+.requirements.zip
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+test.jpg
+*.http
+
+# AWS credentials & temporary files
+*.pem
+*.key
+*.tmp
+*.temp
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Deploy scripts
+deploy.sh
+deploy-force.sh
+
+# Serverless policies
+serverless-deploy-policy.json
+EOF

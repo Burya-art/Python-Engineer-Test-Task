@@ -1,70 +1,65 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks
-from typing import List
-from .crud import create_friend, get_all_friends, get_friend
-from services.llm import ask_llm
+# app/main.py
+import os
+import logging
 
-app = FastAPI()
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("mangum").setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+from fastapi import FastAPI
+from fastapi.routing import APIRoute
+
+app = FastAPI(title="Friends Bot API", redirect_slashes=False)
+
+@app.get("/")
+def root():
+    """Root endpoint"""
+    return {"status": "ok", "message": "Friends Bot API"}
 
 
-# ------------------------------------
-# Health Check (GET + HEAD)
-# ------------------------------------
 @app.get("/health")
-@app.head("/health")
 def health():
-    """Перевіряє стан сервера."""
-    return {"status": "OK"}
+    """Health check з детальною інформацією"""
+    env_vars = {
+        "S3_BUCKET_NAME": os.getenv("S3_BUCKET_NAME", "NOT_SET"),
+        "DYNAMODB_TABLE_NAME": os.getenv("DYNAMODB_TABLE_NAME", "NOT_SET"),
+        "LLM_PROVIDER": os.getenv("LLM_PROVIDER", "NOT_SET"),
+        "BACKEND_BASE_URL": os.getenv("BACKEND_BASE_URL", "NOT_SET"),
+        "has_telegram_token": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
+        "has_openai_key": bool(os.getenv("OPENAI_API_KEY")),
+    }
+
+    logger.info(f"Health check - env: {env_vars}")
+
+    required = ["S3_BUCKET_NAME", "DYNAMODB_TABLE_NAME", "LLM_PROVIDER"]
+    missing = [var for var in required if os.getenv(var) == "NOT_SET" or not os.getenv(var)]
+
+    if missing:
+        logger.warning(f"Missing variables: {missing}")
+        return {
+            "status": "degraded",
+            "missing": missing,
+            "environment": env_vars
+        }
+
+    return {
+        "status": "ok",
+        "environment": env_vars
+    }
 
 
-# ------------------------------------
-# CRUD
-# ------------------------------------
-@app.post("/friends", response_model=dict)
-async def create_friend_endpoint(
-        name: str = Form(...),
-        profession: str = Form(...),
-        profession_description: str = Form(None),
-        photo: UploadFile = File(...)
-):
-    photo_data = await photo.read()
-    if not photo_data:
-        raise HTTPException(400, "Фото не передано")
-    try:
-        friend = create_friend(name, profession, profession_description, photo_data)
-        return friend
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+# КРИТИЧНО: Подключаем роуты ДО создания app, а не в startup
+logger.info("🔧 Loading routes...")
 
+try:
+    from app.routes import friends
+    app.include_router(friends.router, prefix="/friends", tags=["friends"])
+    logger.info("✅ Friends routes loaded")
+except Exception as e:
+    logger.error(f"❌ Failed to load routes: {e}", exc_info=True)
+    raise
 
-@app.get("/friends", response_model=List[dict])
-def list_friends():
-    return get_all_friends()
-
-
-@app.get("/friends/{friend_id}", response_model=dict)
-def friend_detail(friend_id: str):
-    friend = get_friend(friend_id)
-    if not friend:
-        raise HTTPException(404, "Друг не знайдений")
-    return friend
-
-
-# ------------------------------------
-# LLM: /ask
-# ------------------------------------
-@app.post("/friends/{friend_id}/ask")
-async def ask_friend(friend_id: str, body: dict):
-    friend = get_friend(friend_id)
-    if not friend:
-        raise HTTPException(404, "Друг не знайдений")
-
-    question = body.get("question")
-    if not question:
-        raise HTTPException(400, "Питання обов'язкове")
-
-    response = await ask_llm(
-        profession=friend["profession"],
-        description=friend.get("profession_description"),
-        question=question
-    )
-    return {"answer": response}
+# Выводим все зарегистрированные маршруты
+logger.info("📋 Registered routes:")
+for route in app.routes:
+    logger.info(f"  {route.path} - {route.methods if hasattr(route, 'methods') else 'N/A'}")

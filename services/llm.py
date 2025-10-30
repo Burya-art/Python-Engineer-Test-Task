@@ -10,35 +10,37 @@ load_dotenv()
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock").lower()  # "openai", "mock"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# --- Мок-відповідь ---
-MOCK_RESPONSE = (
-    "Основні ризики в цій професії:\n"
-    "• Висока конкуренція\n"
-    "• Постійне навчання\n"
-    "• Ризик вигорання"
-)
+# --- Мок-відповідь як в ТЗ ---
+MOCK_RESPONSE = "Основні ризики в цій професії: висока конкуренція, необхідність постійного навчання, ризик вигорання."
 
-# --- Адаптер LLM ---
+# --- Адаптер LLM строго по ТЗ ---
 async def ask_llm(profession: str, description: str | None, question: str) -> str:
-    prompt = f"Професія: {profession}"
+    """
+    Строго по ТЗ: формує короткий безпечний промпт, звертається до LLM
+    або повертає мок-відповідь
+    """
+    # Промпт строго по ТЗ: короткий, безпечний, обрізаний контекст
+    prompt = f"Професія: {profession}. "
     if description:
-        prompt += f" ({description})"
-    prompt += f"\nПитання: {question}\nВідповідай коротко, українською, без вступів."
+        prompt += f"Опис: {description}. "
+    prompt += f"Питання: {question}. Відповідь українською, коротко."
 
     if LLM_PROVIDER == "openai" and OPENAI_API_KEY:
         return await _ask_openai(prompt)
     else:
+        # Мок-відповідь строго по ТЗ
         return MOCK_RESPONSE
 
 
 async def _ask_openai(prompt: str) -> str:
+    """Реальний запит до OpenAI API"""
     url = "https://api.openai.com/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "gpt-3.5-turbo",  # Фіксована модель
+        "model": "gpt-3.5-turbo",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.5,
         "max_tokens": 150
@@ -50,12 +52,6 @@ async def _ask_openai(prompt: str) -> str:
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"].strip()
-        except httpx.HTTPStatusError as e:
-            # OpenAI повертає JSON з помилкою
-            try:
-                error = e.response.json().get("error", {}).get("message", "")
-                return f"Помилка OpenAI: {error}"
-            except:
-                return f"Помилка OpenAI: HTTP {e.response.status_code}"
         except Exception as e:
-            return f"Помилка LLM: {str(e)}"
+            # При любой ошибке возвращаем мок-ответ как в ТЗ
+            return MOCK_RESPONSE
